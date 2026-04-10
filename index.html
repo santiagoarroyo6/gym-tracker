@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Gym Tracker"/>
+<meta name="theme-color" content="#0C0C0E"/>
+<title>Gym Tracker</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0C0C0E;overscroll-behavior:none}
+body{-webkit-font-smoothing:antialiased;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#EFEFEF}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+input,textarea,button,select{font-family:inherit}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+const{useState,useEffect}=React;
+const A="#B4FF4B",BG="#0C0C0E",BG2="#141417",BG3="#1C1C20";
+const BD="rgba(255,255,255,0.08)",T="#EFEFEF",MT="#888",DIM="#444";
+const MONO="ui-monospace,'SF Mono','Cascadia Mono',monospace";
+const SANS="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+const TC={upper:"#7B9FFF",lower:"#FF9F6B",cardio:"#60D394"};
+const ZC={"Z1-2":"#4FC3F7","Z2-3":"#FFB300","Z4-5":"#FF5252"};
+const ZONES=["Z1-2","Z2-3","Z4-5"];
+const MONTHS=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const DEF_EX={
+  upper:["Press banca","Press inclinado","Remo con barra","Jalón al pecho","Press militar","Curl de bíceps","Extensión tríceps"],
+  lower:["Sentadilla","Peso muerto","Prensa de piernas","Extensión cuádriceps","Curl femoral","Hip thrust","Elevación de pantorrilla"]
+};
+function today(){const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;}
+function fDate(d){if(!d)return"";const[,m,dd]=d.split("-");return`${parseInt(dd)} ${MONTHS[parseInt(m)-1].slice(0,3)}`;}
+function calcPace(km,t){if(!km||!t||!t.includes(":"))return null;const[m,s]=t.split(":").map(Number);const tot=(m||0)*60+(s||0);if(!tot||!parseFloat(km))return null;const spm=tot/parseFloat(km);return`${Math.floor(spm/60)}:${String(Math.round(spm%60)).padStart(2,"0")}/km`;}
+function daysBetween(d1,d2){return Math.floor((new Date(d2)-new Date(d1))/86400000);}
+const ls={get:(k,fb)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}},set:(k,d)=>{try{localStorage.setItem(k,JSON.stringify(d));}catch{}}};
+const inp=(x={})=>({background:BG3,border:`1px solid ${BD}`,borderRadius:10,padding:"11px 14px",color:T,fontSize:14,fontFamily:MONO,outline:"none",boxSizing:"border-box",width:"100%",...x});
+const btnS=(x={})=>({background:BG3,border:`1px solid ${BD}`,borderRadius:10,padding:"10px 16px",color:MT,cursor:"pointer",fontFamily:SANS,fontSize:13,...x});
+const Card=({children,s})=><div style={{background:BG2,border:`1px solid ${BD}`,borderRadius:12,padding:"14px 16px",...s}}>{children}</div>;
+const Label=({children})=><div style={{fontSize:11,color:MT,fontFamily:MONO,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>{children}</div>;
+const Sec=({label,children,s})=><div style={{padding:"0 16px",...s}}>{label&&<Label>{label}</Label>}{children}</div>;
+
+function App(){
+  const[view,setView]=useState("dashboard");
+  const[workouts,setWorkouts]=useState([]);
+  const[exercises,setExercises]=useState(DEF_EX);
+  const[weights,setWeights]=useState([]);
+  const[nutrition,setNutrition]=useState({});
+  const[goals,setGoals]=useState({calories:2500,protein:180});
+  useEffect(()=>{
+    setWorkouts(ls.get("gt_workouts",[]));
+    setExercises(ls.get("gt_exercises",DEF_EX));
+    setWeights(ls.get("gt_weights",[]));
+    setNutrition(ls.get("gt_nutrition",{}));
+    setGoals(ls.get("gt_goals",{calories:2500,protein:180}));
+  },[]);
+  const saveWorkouts=d=>{setWorkouts(d);ls.set("gt_workouts",d);};
+  const saveExercises=d=>{setExercises(d);ls.set("gt_exercises",d);};
+  const saveWeights=d=>{setWeights(d);ls.set("gt_weights",d);};
+  const saveNutrition=d=>{setNutrition(d);ls.set("gt_nutrition",d);};
+  const saveGoals=d=>{setGoals(d);ls.set("gt_goals",d);};
+  const addWorkout=w=>{const d=[{...w,id:Date.now()},...workouts];saveWorkouts(d);};
+  const addWeight=e=>{const d=[e,...weights.filter(x=>x.date!==e.date)].sort((a,b)=>b.date.localeCompare(a.date));saveWeights(d);};
+  const setNutDay=(date,data)=>{const d={...nutrition,[date]:data};saveNutrition(d);};
+  const props={workouts,exercises,weights,nutrition,goals,saveExercises,addWorkout,addWeight,setNutDay,saveGoals,setView};
+  return(
+    <div style={{background:BG,minHeight:"100dvh",display:"flex",flexDirection:"column",fontFamily:SANS,color:T}}>
+      <div style={{flex:1,overflowY:"auto",paddingBottom:64}}>
+        {view==="dashboard"&&<Dashboard {...props}/>}
+        {view==="new"&&<NewWorkout {...props}/>}
+        {view==="history"&&<History {...props}/>}
+        {view==="nutrition"&&<Nutrition {...props}/>}
+        {view==="library"&&<Library {...props}/>}
+      </div>
+      <BottomNav view={view} setView={setView}/>
+    </div>
+  );
+}
+
+function Dashboard({workouts,weights,nutrition,goals,setView}){
+  const td=today(),tn=nutrition[td],lw=weights[0];
+  const days=lw?daysBetween(lw.date,td):999;
+  return(
+    <div>
+      <div style={{padding:"20px 16px 12px",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div>
+          <div style={{fontSize:11,color:MT,fontFamily:MONO,letterSpacing:2,textTransform:"uppercase"}}>{new Date().toLocaleDateString("es",{weekday:"long",day:"numeric",month:"long"})}</div>
+          <div style={{fontSize:26,fontWeight:700,letterSpacing:-0.5,marginTop:2}}>Dashboard</div>
+        </div>
+        {lw&&<div style={{textAlign:"right"}}><div style={{fontSize:11,color:MT}}>peso actual</div><div style={{fontSize:22,fontWeight:700,fontFamily:MONO,color:A}}>{lw.weight}<span style={{fontSize:12,color:MT}}>kg</span></div></div>}
+      </div>
+      {days>=7&&(
+        <div style={{padding:"0 16px",marginBottom:12}}>
+          <div style={{background:"rgba(180,255,75,0.07)",border:"1px solid rgba(180,255,75,0.2)",borderRadius:10,padding:"10px 14px",fontSize:13,color:A,display:"flex",gap:8}}>
+            <span>⚡</span><span>{days===999?"Registra tu peso esta semana":`Peso no registrado hace ${days} días`}</span>
+          </div>
+        </div>
+      )}
+      <Sec label="hoy" s={{marginBottom:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {[["calorías",tn?.calories,goals.calories,"kcal",T],["proteína",tn?.protein,goals.protein,"g",A]].map(([l,v,g,u,c])=>(
+            <Card key={l} s={{textAlign:"center"}}>
+              <div style={{fontSize:11,color:MT,marginBottom:4}}>{l}</div>
+              <div style={{fontSize:26,fontWeight:700,fontFamily:MONO,color:v?c:DIM}}>{v||"--"}</div>
+              {g>0&&v&&<div style={{fontSize:11,color:DIM}}>/ {g}{u}</div>}
+            </Card>
+          ))}
+        </div>
+      </Sec>
+      <div style={{padding:"0 16px",marginBottom:18}}>
+        <button onClick={()=>setView("new")} style={{width:"100%",background:A,color:"#000",border:"none",borderRadius:12,padding:15,fontSize:15,fontWeight:700,cursor:"pointer"}}>+ Nuevo entrenamiento</button>
+      </div>
+      {workouts.length>0&&(
+        <Sec label="recientes">
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {workouts.slice(0,4).map(w=><WRow key={w.id} w={w}/>)}
+          </div>
+        </Sec>
+      )}
+      {!workouts.length&&<div style={{textAlign:"center",color:DIM,marginTop:30,fontSize:14}}>Aún no hay entrenamientos. ¡Échenle ganas!</div>}
+    </div>
+  );
+}
+
+function WRow({w,onClick}){
+  const tc=TC[w.type]||MT;
+  const sum=w.type==="cardio"?`${w.cardio?.distance}km · ${w.cardio?.time} · ${calcPace(w.cardio?.distance,w.cardio?.time)||""}`:`${w.exercises?.filter(e=>e.sets?.length>0).length||0} ejercicios · ${w.exercises?.reduce((a,e)=>a+(e.sets?.length||0),0)||0} sets`;
+  return(
+    <Card s={{cursor:onClick?"pointer":"default"}} onClick={onClick}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+          <span style={{background:`${tc}22`,color:tc,fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:6,fontFamily:MONO}}>{w.type?.toUpperCase()}</span>
+          <span style={{fontSize:13,color:MT}}>{sum}</span>
+        </div>
+        <span style={{fontSize:12,color:DIM,fontFamily:MONO}}>{fDate(w.date)}</span>
+      </div>
+    </Card>
+  );
+}
+
+function NewWorkout({exercises,workouts,addWorkout,setView}){
+  const[step,setStep]=useState("type");
+  const[type,setType]=useState(null);
+  const[date,setDate]=useState(today());
+  const[wExs,setWExs]=useState([]);
+  const[newEx,setNewEx]=useState("");
+  const[dist,setDist]=useState("");const[time,setTime]=useState("");const[zone,setZone]=useState("Z2-3");const[notes,setNotes]=useState("");
+  const[showRef,setShowRef]=useState(false);
+  const pace=calcPace(dist,time);
+  const ref=workouts.filter(w=>w.type===type).slice(0,3);
+  const pickType=t=>{setType(t);if(t==="upper"||t==="lower")setWExs(exercises[t].map(n=>({name:n,sets:[]})));setStep("form");};
+  const addSet=i=>{const u=[...wExs];u[i].sets=[...u[i].sets,{weight:"",reps:""}];setWExs(u);};
+  const rmSet=(i,j)=>{const u=[...wExs];u[i].sets=u[i].sets.filter((_,x)=>x!==j);setWExs(u);};
+  const updSet=(i,j,f,v)=>{const u=[...wExs];u[i].sets[j][f]=v;setWExs(u);};
+  const rmEx=i=>setWExs(wExs.filter((_,x)=>x!==i));
+  const addCustom=()=>{if(!newEx.trim())return;setWExs([...wExs,{name:newEx.trim(),sets:[]}]);setNewEx("");};
+  const handleSave=()=>{
+    if(type==="cardio"){if(!dist||!time)return;addWorkout({date,type:"cardio",cardio:{distance:parseFloat(dist),time,zone,notes,pace}});}
+    else{const f=wExs.filter(e=>e.sets.length>0);if(!f.length)return;addWorkout({date,type,exercises:f});}
+    setView("history");
+  };
+  const Header=({onBack,title})=>(
+    <div style={{padding:"18px 16px 12px",display:"flex",alignItems:"center",gap:12}}>
+      <button onClick={onBack} style={{background:"none",border:"none",color:MT,cursor:"pointer",fontSize:22,padding:0,lineHeight:1}}>←</button>
+      <span style={{fontSize:22,fontWeight:700}}>{title}</span>
+      {step==="form"&&<input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{...inp({width:"auto",marginLeft:"auto",fontSize:12,padding:"5px 10px",color:MT})}}/>}
+    </div>
+  );
+  if(step==="type")return(
+    <div>
+      <Header onBack={()=>setView("dashboard")} title="Nuevo entrenamiento"/>
+      <div style={{padding:"4px 16px 8px",fontSize:13,color:MT}}>¿Qué tipo de sesión es hoy?</div>
+      <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:12}}>
+        {[{t:"upper",l:"Upper",s:"Pecho, espalda, hombros, brazos"},{t:"lower",l:"Lower",s:"Cuádriceps, isquiotibiales, glúteos"},{t:"cardio",l:"Cardio",s:"Correr · ritmo · zona de entrenamiento"}].map(o=>(
+          <button key={o.t} onClick={()=>pickType(o.t)} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:14,padding:"16px 18px",textAlign:"left",cursor:"pointer",display:"flex",gap:16,alignItems:"center"}}>
+            <div style={{width:46,height:46,background:`${TC[o.t]}1A`,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{width:14,height:14,background:TC[o.t],borderRadius:"50%"}}/>
+            </div>
+            <div><div style={{fontSize:17,fontWeight:700,color:T}}>{o.l}</div><div style={{fontSize:12,color:MT,marginTop:2}}>{o.s}</div></div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+  return(
+    <div>
+      <Header onBack={()=>setStep("type")} title={type==="cardio"?"Cardio":type==="upper"?"Upper":"Lower"}/>
+      {ref.length>0&&(
+        <div style={{padding:"0 16px",marginBottom:12}}>
+          <button onClick={()=>setShowRef(!showRef)} style={{...btnS({width:"100%",display:"flex",justifyContent:"space-between",fontSize:12})}}>
+            <span>📊 Últimas {ref.length} sesiones de referencia</span><span>{showRef?"▲":"▼"}</span>
+          </button>
+          {showRef&&<div style={{marginTop:8,display:"flex",flexDirection:"column",gap:6}}>{ref.map((rw,i)=><RefCard key={i} w={rw}/>)}</div>}
+        </div>
+      )}
+      {type==="cardio"
+        ?<CardioForm dist={dist} setDist={setDist} time={time} setTime={setTime} zone={zone} setZone={setZone} notes={notes} setNotes={setNotes} pace={pace}/>
+        :<StrengthForm exs={wExs} addSet={addSet} rmSet={rmSet} updSet={updSet} rmEx={rmEx} newEx={newEx} setNewEx={setNewEx} addCustom={addCustom}/>
+      }
+      <div style={{padding:"16px 16px 8px"}}>
+        <button onClick={handleSave} style={{width:"100%",background:A,color:"#000",border:"none",borderRadius:12,padding:14,fontSize:15,fontWeight:700,cursor:"pointer"}}>Guardar entrenamiento</button>
+      </div>
+    </div>
+  );
+}
+
+function RefCard({w}){
+  const tc=TC[w.type]||MT;
+  return(
+    <div style={{background:BG3,border:`1px solid ${BD}`,borderRadius:10,padding:"10px 12px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+        <span style={{fontSize:11,color:tc,fontWeight:700,fontFamily:MONO}}>{w.type?.toUpperCase()}</span>
+        <span style={{fontSize:11,color:DIM,fontFamily:MONO}}>{fDate(w.date)}</span>
+      </div>
+      {w.type==="cardio"
+        ?<div style={{fontSize:13,color:MT}}>{w.cardio?.distance}km · {w.cardio?.time} · {w.cardio?.pace||calcPace(w.cardio?.distance,w.cardio?.time)} · <span style={{color:ZC[w.cardio?.zone]}}>{w.cardio?.zone}</span></div>
+        :<div style={{display:"flex",flexDirection:"column",gap:3}}>{w.exercises?.filter(e=>e.sets?.length>0).map((e,i)=>(
+          <div key={i} style={{fontSize:12,display:"flex",gap:8}}>
+            <span style={{color:T,minWidth:130}}>{e.name}</span>
+            <span style={{fontFamily:MONO,color:DIM}}>{e.sets.map(s=>`${s.weight}×${s.reps}`).join(" · ")}</span>
+          </div>
+        ))}</div>
+      }
+    </div>
+  );
+}
+
+function CardioForm({dist,setDist,time,setTime,zone,setZone,notes,setNotes,pace}){
+  return(
+    <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div><Label>Distancia (km)</Label><input type="number" step="0.1" placeholder="10.0" value={dist} onChange={e=>setDist(e.target.value)} style={inp()}/></div>
+        <div><Label>Tiempo (MM:SS)</Label><input type="text" placeholder="45:30" value={time} onChange={e=>setTime(e.target.value)} style={inp()}/></div>
+      </div>
+      {pace&&(
+        <div style={{background:`${A}0D`,border:`1px solid ${A}33`,borderRadius:10,padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <span style={{fontSize:12,color:MT}}>Ritmo calculado</span>
+          <span style={{fontSize:20,fontWeight:700,fontFamily:MONO,color:A}}>{pace}</span>
+        </div>
+      )}
+      <div>
+        <Label>Zona de entrenamiento</Label>
+        <div style={{display:"flex",gap:8}}>
+          {ZONES.map(z=>(
+            <button key={z} onClick={()=>setZone(z)} style={{flex:1,background:zone===z?`${ZC[z]}1A`:BG3,border:`1px solid ${zone===z?ZC[z]:BD}`,borderRadius:10,padding:"10px 0",color:zone===z?ZC[z]:MT,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:MONO}}>{z}</button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <Label>Notas (opcional)</Label>
+        <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Ruta, sensaciones, condiciones..." style={{...inp(),height:72,resize:"none"}}/>
+      </div>
+    </div>
+  );
+}
+
+function StrengthForm({exs,addSet,rmSet,updSet,rmEx,newEx,setNewEx,addCustom}){
+  return(
+    <div style={{padding:"0 16px"}}>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {exs.map((ex,i)=>(
+          <div key={i} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:12,padding:"12px 14px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:ex.sets.length?8:0}}>
+              <span style={{fontSize:14,fontWeight:600,color:T}}>{ex.name}</span>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <button onClick={()=>addSet(i)} style={{background:`${A}1A`,color:A,border:`1px solid ${A}33`,borderRadius:6,padding:"3px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>+ Set</button>
+                {ex.sets.length===0&&<button onClick={()=>rmEx(i)} style={{background:"none",border:"none",color:DIM,cursor:"pointer",fontSize:18,padding:"0 2px",lineHeight:1}}>×</button>}
+              </div>
+            </div>
+            {ex.sets.map((s,j)=>(
+              <div key={j} style={{display:"flex",alignItems:"center",gap:8,marginTop:6}}>
+                <span style={{fontSize:11,color:DIM,fontFamily:MONO,minWidth:22}}>S{j+1}</span>
+                <input type="number" placeholder="kg" value={s.weight} onChange={e=>updSet(i,j,"weight",e.target.value)} style={{background:BG3,border:`1px solid ${BD}`,borderRadius:6,padding:"6px 10px",color:T,fontSize:13,fontFamily:MONO,width:65,outline:"none"}}/>
+                <span style={{color:DIM,fontSize:12}}>×</span>
+                <input type="number" placeholder="reps" value={s.reps} onChange={e=>updSet(i,j,"reps",e.target.value)} style={{background:BG3,border:`1px solid ${BD}`,borderRadius:6,padding:"6px 10px",color:T,fontSize:13,fontFamily:MONO,width:60,outline:"none"}}/>
+                <button onClick={()=>rmSet(i,j)} style={{background:"none",border:"none",color:DIM,cursor:"pointer",fontSize:18,padding:"0 2px",lineHeight:1}}>×</button>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:8,marginTop:10}}>
+        <input type="text" placeholder="Agregar ejercicio personalizado..." value={newEx} onChange={e=>setNewEx(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCustom()} style={{...inp({flex:1,width:"auto"})}}/>
+        <button onClick={addCustom} style={{...btnS({padding:"11px 18px",fontSize:16})}}>+</button>
+      </div>
+    </div>
+  );
+}
+
+function History({workouts}){
+  const[filter,setFilter]=useState("all");
+  const[sel,setSel]=useState(null);
+  const fil=filter==="all"?workouts:workouts.filter(w=>w.type===filter);
+  return(
+    <div>
+      <div style={{padding:"20px 16px 12px"}}>
+        <div style={{fontSize:22,fontWeight:700,marginBottom:12}}>Historial</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {["all","upper","lower","cardio"].map(f=>(
+            <button key={f} onClick={()=>setFilter(f)} style={{background:filter===f?(f==="all"?A:TC[f]):BG3,color:filter===f?"#000":MT,border:`1px solid ${filter===f?(f==="all"?A:TC[f]):BD}`,borderRadius:20,padding:"5px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+              {f==="all"?"Todos":f.charAt(0).toUpperCase()+f.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
+        {!fil.length&&<div style={{textAlign:"center",color:DIM,marginTop:40,fontSize:14}}>Sin sesiones registradas</div>}
+        {fil.map(w=><WRow key={w.id} w={w} onClick={()=>setSel(w)}/>)}
+      </div>
+      {sel&&<WModal w={sel} onClose={()=>setSel(null)}/>}
+    </div>
+  );
+}
+
+function WModal({w,onClose}){
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"flex-end",zIndex:100}}>
+      <div style={{background:BG2,border:`1px solid ${BD}`,borderRadius:"20px 20px 0 0",padding:"20px 18px 28px",width:"100%",maxHeight:"75vh",overflowY:"auto",boxSizing:"border-box"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div>
+            <span style={{fontSize:18,fontWeight:700}}>{w.type==="cardio"?"Cardio":w.type==="upper"?"Upper":"Lower"}</span>
+            <span style={{fontSize:12,color:MT,fontFamily:MONO,marginLeft:10}}>{fDate(w.date)}</span>
+          </div>
+          <button onClick={onClose} style={{...btnS({padding:"5px 12px",fontSize:18,borderRadius:8})}}>×</button>
+        </div>
+        {w.type==="cardio"?(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {[["distancia",`${w.cardio?.distance} km`,T],["tiempo",w.cardio?.time,T],["ritmo",w.cardio?.pace||calcPace(w.cardio?.distance,w.cardio?.time),A],["zona",w.cardio?.zone,ZC[w.cardio?.zone]]].map(([l,v,c])=>(
+              <Card key={l} s={{}}><div style={{fontSize:11,color:MT,fontFamily:MONO,marginBottom:3}}>{l}</div><div style={{fontSize:17,fontWeight:700,fontFamily:MONO,color:c}}>{v}</div></Card>
+            ))}
+            {w.cardio?.notes&&<Card s={{gridColumn:"1/-1"}}><div style={{fontSize:11,color:MT,fontFamily:MONO,marginBottom:4}}>notas</div><div style={{fontSize:13,color:MT}}>{w.cardio.notes}</div></Card>}
+          </div>
+        ):(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {w.exercises?.map((ex,i)=>(
+              <Card key={i} s={{}}><div style={{fontSize:13,fontWeight:600,color:T,marginBottom:6}}>{ex.name}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {ex.sets?.map((s,j)=><span key={j} style={{background:BG3,border:`1px solid ${BD}`,borderRadius:6,padding:"3px 8px",fontSize:12,fontFamily:MONO,color:MT}}>S{j+1}: {s.weight}kg×{s.reps}</span>)}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Nutrition({nutrition,goals,setNutDay,saveGoals}){
+  const now=new Date();
+  const[yr,setYr]=useState(now.getFullYear());
+  const[mo,setMo]=useState(now.getMonth());
+  const[selDay,setSelDay]=useState(null);
+  const[cal,setCal]=useState("");const[pro,setPro]=useState("");
+  const[showGoals,setShowGoals]=useState(false);
+  const[gc,setGc]=useState(String(goals.calories));const[gp,setGp]=useState(String(goals.protein));
+  const dim=new Date(yr,mo+1,0).getDate();
+  const fd=(new Date(yr,mo,1).getDay()||7)-1;
+  const DN=["L","M","M","J","V","S","D"];
+  const openDay=d=>{
+    const k=`${yr}-${String(mo+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const e=nutrition[k];
+    setCal(e?.calories?String(e.calories):"");setPro(e?.protein?String(e.protein):"");
+    setSelDay({d,k});
+  };
+  const save=()=>{if(!selDay)return;setNutDay(selDay.k,{calories:parseFloat(cal)||0,protein:parseFloat(pro)||0});setSelDay(null);};
+  const dayKey=d=>`${yr}-${String(mo+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  const cellData=d=>{const e=nutrition[dayKey(d)];return e||null;};
+  const cellStatus=d=>{
+    const e=cellData(d);
+    if(!e||(!e.calories&&!e.protein))return"empty";
+    const calOk=goals.calories?Math.abs(e.calories-goals.calories)<=200:true;
+    const proOk=goals.protein?Math.abs(e.protein-goals.protein)<=20:true;
+    return calOk&&proOk?"met":"partial";
+  };
+  const SBG={empty:BG3,met:"rgba(180,255,75,0.13)",partial:"rgba(255,179,0,0.12)"};
+  const SBD={empty:BD,met:"rgba(180,255,75,0.35)",partial:"rgba(255,179,0,0.35)"};
+  const SC={empty:DIM,met:A,partial:"#FFB300"};
+  const isToday=d=>dayKey(d)===today();
+  return(
+    <div>
+      <div style={{padding:"20px 16px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{fontSize:22,fontWeight:700}}>Nutrición</div>
+        <button onClick={()=>setShowGoals(!showGoals)} style={{...btnS({fontSize:12,padding:"6px 12px",color:showGoals?A:MT})}}>Metas</button>
+      </div>
+      {showGoals&&(
+        <div style={{padding:"0 16px",marginBottom:12}}>
+          <Card s={{}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              <div><Label>Meta calorías</Label><input type="number" value={gc} onChange={e=>setGc(e.target.value)} style={inp({})}/></div>
+              <div><Label>Meta proteína (g)</Label><input type="number" value={gp} onChange={e=>setGp(e.target.value)} style={inp({})}/></div>
+            </div>
+            <button onClick={()=>{saveGoals({calories:parseFloat(gc)||0,protein:parseFloat(gp)||0});setShowGoals(false);}} style={{width:"100%",background:A,color:"#000",border:"none",borderRadius:8,padding:"10px",fontWeight:700,cursor:"pointer",fontSize:13}}>Guardar metas</button>
+          </Card>
+        </div>
+      )}
+      <div style={{padding:"0 16px",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <button onClick={()=>{if(mo===0){setMo(11);setYr(y=>y-1);}else setMo(m=>m-1);}} style={{...btnS({padding:"5px 12px",fontSize:17,borderRadius:8})}}>‹</button>
+        <span style={{fontWeight:600,fontSize:15}}>{MONTHS[mo]} {yr}</span>
+        <button onClick={()=>{if(mo===11){setMo(0);setYr(y=>y+1);}else setMo(m=>m+1);}} style={{...btnS({padding:"5px 12px",fontSize:17,borderRadius:8})}}>›</button>
+      </div>
+      <div style={{padding:"0 16px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:4}}>
+          {DN.map((d,i)=><div key={i} style={{textAlign:"center",fontSize:11,color:DIM,fontFamily:MONO,padding:"2px 0"}}>{d}</div>)}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}}>
+          {Array.from({length:fd},(_,i)=><div key={`e${i}`} style={{height:62}}/>)}
+          {Array.from({length:dim},(_,i)=>{
+            const d=i+1,st=cellStatus(d),e=cellData(d),it=isToday(d);
+            const bc=SC[st],bb=it?`2px solid ${A}`:st==="empty"?`1px solid ${BD}`:`1px solid ${SBD[st]}`;
+            return(
+              <button key={d} onClick={()=>openDay(d)} style={{height:62,background:SBG[st],border:bb,borderRadius:8,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"flex-start",padding:"6px 2px 4px",boxSizing:"border-box",overflow:"hidden"}}>
+                <span style={{fontSize:13,fontWeight:it?700:500,color:st==="empty"?(it?A:MT):bc,fontFamily:MONO,lineHeight:1}}>{d}</span>
+                {e?.calories>0&&<span style={{fontSize:9,color:bc,fontFamily:MONO,marginTop:3,lineHeight:1,opacity:0.9}}>{e.calories}<span style={{fontSize:8,opacity:0.7}}>k</span></span>}
+                {e?.protein>0&&<span style={{fontSize:9,color:st==="met"?"rgba(180,255,75,0.7)":"rgba(255,179,0,0.75)",fontFamily:MONO,marginTop:2,lineHeight:1}}>{e.protein}<span style={{fontSize:8,opacity:0.7}}>g</span></span>}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{display:"flex",gap:12,marginTop:10,flexWrap:"wrap"}}>
+          {[[BG3,BD,"Sin datos"],[A,"rgba(180,255,75,0.35)","Meta (±200kcal/±20g)"],["#FFB300","rgba(255,179,0,0.35)","Parcial"]].map(([c,bc,l])=>(
+            <div key={l} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:MT}}>
+              <div style={{width:14,height:14,background:`${c}1A`,border:`1px solid ${bc}`,borderRadius:3}}/><span>{l}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      {selDay&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"flex-end",zIndex:100}}>
+          <div style={{background:BG2,border:`1px solid ${BD}`,borderRadius:"20px 20px 0 0",padding:"22px 18px 32px",width:"100%",boxSizing:"border-box"}}>
+            <div style={{fontSize:16,fontWeight:700,marginBottom:14}}>{selDay.d} {MONTHS[mo]} {yr}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+              <div><Label>Calorías</Label><input type="number" value={cal} onChange={e=>setCal(e.target.value)} style={inp({fontSize:18})} placeholder={goals.calories||"2500"}/>{goals.calories>0&&<div style={{fontSize:11,color:DIM,marginTop:3}}>meta: {goals.calories} kcal</div>}</div>
+              <div><Label>Proteína (g)</Label><input type="number" value={pro} onChange={e=>setPro(e.target.value)} style={inp({fontSize:18})} placeholder={goals.protein||"180"}/>{goals.protein>0&&<div style={{fontSize:11,color:DIM,marginTop:3}}>meta: {goals.protein}g</div>}</div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setSelDay(null)} style={{...btnS({flex:1})}}>Cancelar</button>
+              <button onClick={save} style={{flex:2,background:A,color:"#000",border:"none",borderRadius:10,padding:12,fontWeight:700,cursor:"pointer",fontSize:14}}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Library({exercises,weights,saveExercises,addWeight}){
+  const[tab,setTab]=useState("upper");
+  const[newEx,setNewEx]=useState("");
+  const[editing,setEditing]=useState(null);
+  const[wi,setWi]=useState("");const[wd,setWd]=useState(today());
+  const addEx=()=>{if(!newEx.trim())return;const u={...exercises,[tab]:[...exercises[tab],newEx.trim()]};saveExercises(u);setNewEx("");};
+  const rmEx=(c,i)=>{const u={...exercises,[c]:exercises[c].filter((_,x)=>x!==i)};saveExercises(u);};
+  const saveEdit=()=>{if(!editing||!editing.v.trim()){setEditing(null);return;}const u={...exercises};u[editing.c][editing.i]=editing.v.trim();saveExercises(u);setEditing(null);};
+  const logW=()=>{if(!wi)return;addWeight({date:wd,weight:parseFloat(wi)});setWi("");};
+  return(
+    <div>
+      <div style={{padding:"20px 16px 12px"}}><div style={{fontSize:22,fontWeight:700}}>Biblioteca</div></div>
+      <Sec label="peso corporal" s={{marginBottom:20}}>
+        <Card s={{}}>
+          <div style={{display:"flex",gap:8,marginBottom:weights.length?12:0}}>
+            <input type="number" step="0.1" placeholder="kg" value={wi} onChange={e=>setWi(e.target.value)} style={{...inp({flex:1,width:"auto"})}}/>
+            <input type="date" value={wd} onChange={e=>setWd(e.target.value)} style={{...inp({width:"auto",color:MT,fontSize:12})}}/>
+            <button onClick={logW} style={{background:A,color:"#000",border:"none",borderRadius:10,padding:"0 18px",fontWeight:700,fontSize:15,cursor:"pointer"}}>+</button>
+          </div>
+          {!weights.length&&<div style={{textAlign:"center",color:DIM,fontSize:13,padding:"6px 0"}}>Sin registros aún</div>}
+          {weights.slice(0,8).map((bw,i)=>(
+            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:i<Math.min(weights.length,8)-1?`0.5px solid ${BD}`:"none"}}>
+              <span style={{fontSize:12,color:MT,fontFamily:MONO}}>{fDate(bw.date)}</span>
+              <span style={{fontSize:16,fontWeight:600,fontFamily:MONO,color:i===0?A:T}}>{bw.weight} kg</span>
+            </div>
+          ))}
+        </Card>
+      </Sec>
+      <Sec label="ejercicios">
+        <div style={{display:"flex",gap:8,marginBottom:10}}>
+          {["upper","lower"].map(t=>(
+            <button key={t} onClick={()=>setTab(t)} style={{background:tab===t?TC[t]:BG3,color:tab===t?"#000":MT,border:`1px solid ${tab===t?TC[t]:BD}`,borderRadius:20,padding:"5px 16px",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+              {t.charAt(0).toUpperCase()+t.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {exercises[tab]?.map((ex,i)=>(
+            <div key={i} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:10,padding:"10px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              {editing?.c===tab&&editing?.i===i
+                ?<input value={editing.v} onChange={e=>setEditing({...editing,v:e.target.value})} onBlur={saveEdit} onKeyDown={e=>e.key==="Enter"&&saveEdit()} autoFocus style={{...inp({flex:1,width:"auto",border:`1px solid ${A}`,padding:"5px 8px",fontSize:13})}}/>
+                :<span style={{fontSize:14,color:T}}>{ex}</span>
+              }
+              <div style={{display:"flex",gap:8,marginLeft:10}}>
+                <button onClick={()=>setEditing({c:tab,i,v:ex})} style={{background:"none",border:"none",color:DIM,cursor:"pointer",fontSize:14,padding:"0 3px"}}>✎</button>
+                <button onClick={()=>rmEx(tab,i)} style={{background:"none",border:"none",color:DIM,cursor:"pointer",fontSize:18,padding:"0 3px",lineHeight:1}}>×</button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:8,marginTop:10}}>
+          <input type="text" placeholder="Nuevo ejercicio..." value={newEx} onChange={e=>setNewEx(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addEx()} style={{...inp({flex:1,width:"auto"})}}/>
+          <button onClick={addEx} style={{background:A,color:"#000",border:"none",borderRadius:10,padding:"0 18px",fontWeight:700,fontSize:16,cursor:"pointer"}}>+</button>
+        </div>
+      </Sec>
+    </div>
+  );
+}
+
+function BottomNav({view,setView}){
+  const tabs=[{id:"dashboard",label:"Inicio",ico:"⌂"},{id:"new",label:"Nuevo",ico:"+"},{id:"history",label:"Historial",ico:"≡"},{id:"nutrition",label:"Nutrición",ico:"◎"},{id:"library",label:"Biblioteca",ico:"◈"}];
+  return(
+    <div style={{position:"fixed",bottom:0,left:0,right:0,background:BG2,borderTop:`1px solid ${BD}`,display:"flex",paddingBottom:"env(safe-area-inset-bottom)"}}>
+      {tabs.map(t=>(
+        <button key={t.id} onClick={()=>setView(t.id)} style={{flex:1,background:"none",border:"none",color:view===t.id?A:DIM,padding:"9px 0 7px",fontSize:10,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,fontFamily:SANS}}>
+          <span style={{fontSize:t.id==="new"?20:17,lineHeight:1}}>{t.ico}</span>
+          <span style={{fontWeight:view===t.id?600:400}}>{t.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
