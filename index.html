@@ -136,7 +136,7 @@ function WRow({w,onClick}){
     ?`${w.cardio?.distance}km · ${w.cardio?.time} · ${calcPace(w.cardio?.distance,w.cardio?.time)||""}`
     :`${w.exercises?.filter(e=>e.sets?.length>0).length||0} ejercicios · ${w.exercises?.reduce((a,e)=>a+(e.sets?.length||0),0)||0} sets`;
   return(
-    <div onClick={onClick} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:12,padding:"12px 14px",cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
+    <button onClick={onClick} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:12,padding:"12px 14px",cursor:"pointer",width:"100%",textAlign:"left",display:"block"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div style={{display:"flex",gap:10,alignItems:"center",flex:1,minWidth:0}}>
           <span style={{background:`${tc}22`,color:tc,fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:6,fontFamily:MONO,flexShrink:0}}>{w.type?.toUpperCase()}</span>
@@ -147,7 +147,7 @@ function WRow({w,onClick}){
           <span style={{fontSize:16,color:DIM}}>›</span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
