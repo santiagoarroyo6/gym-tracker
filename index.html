@@ -53,6 +53,7 @@ function App(){
   const[weights,setWeights]=useState([]);
   const[nutrition,setNutrition]=useState({});
   const[goals,setGoals]=useState({calories:2500,protein:180});
+  const[selWorkout,setSelWorkout]=useState(null);
   useEffect(()=>{
     setWorkouts(ls.get("gt_workouts",[]));
     setExercises(ls.get("gt_exercises",DEF_EX));
@@ -71,13 +72,14 @@ function App(){
   const props={workouts,exercises,weights,nutrition,goals,saveExercises,addWorkout,addWeight,setNutDay,saveGoals,setView};
   return(
     <div style={{background:BG,minHeight:"100dvh",display:"flex",flexDirection:"column",fontFamily:SANS,color:T}}>
-      <div style={{flex:1,overflowY:"auto",paddingBottom:64}}>
+      <div style={{flex:1,overflowY:"auto",paddingBottom:64,paddingTop:"env(safe-area-inset-top)"}}>
         {view==="dashboard"&&<Dashboard {...props}/>}
         {view==="new"&&<NewWorkout {...props}/>}
         {view==="history"&&<History {...props}/>}
         {view==="nutrition"&&<Nutrition {...props}/>}
         {view==="library"&&<Library {...props}/>}
       </div>
+      {selWorkout&&<WModal w={selWorkout} onClose={()=>setSelWorkout(null)}/>}
       <BottomNav view={view} setView={setView}/>
     </div>
   );
@@ -130,17 +132,22 @@ function Dashboard({workouts,weights,nutrition,goals,setView}){
 
 function WRow({w,onClick}){
   const tc=TC[w.type]||MT;
-  const sum=w.type==="cardio"?`${w.cardio?.distance}km · ${w.cardio?.time} · ${calcPace(w.cardio?.distance,w.cardio?.time)||""}`:`${w.exercises?.filter(e=>e.sets?.length>0).length||0} ejercicios · ${w.exercises?.reduce((a,e)=>a+(e.sets?.length||0),0)||0} sets`;
+  const sum=w.type==="cardio"
+    ?`${w.cardio?.distance}km · ${w.cardio?.time} · ${calcPace(w.cardio?.distance,w.cardio?.time)||""}`
+    :`${w.exercises?.filter(e=>e.sets?.length>0).length||0} ejercicios · ${w.exercises?.reduce((a,e)=>a+(e.sets?.length||0),0)||0} sets`;
   return(
-    <Card s={{cursor:onClick?"pointer":"default"}} onClick={onClick}>
+    <div onClick={onClick} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:12,padding:"12px 14px",cursor:"pointer",WebkitTapHighlightColor:"transparent"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{display:"flex",gap:10,alignItems:"center"}}>
-          <span style={{background:`${tc}22`,color:tc,fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:6,fontFamily:MONO}}>{w.type?.toUpperCase()}</span>
-          <span style={{fontSize:13,color:MT}}>{sum}</span>
+        <div style={{display:"flex",gap:10,alignItems:"center",flex:1,minWidth:0}}>
+          <span style={{background:`${tc}22`,color:tc,fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:6,fontFamily:MONO,flexShrink:0}}>{w.type?.toUpperCase()}</span>
+          <span style={{fontSize:13,color:MT,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sum}</span>
         </div>
-        <span style={{fontSize:12,color:DIM,fontFamily:MONO}}>{fDate(w.date)}</span>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,marginLeft:8}}>
+          <span style={{fontSize:12,color:DIM,fontFamily:MONO}}>{fDate(w.date)}</span>
+          <span style={{fontSize:16,color:DIM}}>›</span>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -293,9 +300,8 @@ function StrengthForm({exs,addSet,rmSet,updSet,rmEx,newEx,setNewEx,addCustom}){
   );
 }
 
-function History({workouts}){
+function History({workouts,setSelWorkout}){
   const[filter,setFilter]=useState("all");
-  const[sel,setSel]=useState(null);
   const fil=filter==="all"?workouts:workouts.filter(w=>w.type===filter);
   return(
     <div>
@@ -311,39 +317,61 @@ function History({workouts}){
       </div>
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
         {!fil.length&&<div style={{textAlign:"center",color:DIM,marginTop:40,fontSize:14}}>Sin sesiones registradas</div>}
-        {fil.map(w=><WRow key={w.id} w={w} onClick={()=>setSel(w)}/>)}
+        {fil.map(w=><WRow key={w.id} w={w} onClick={()=>setSelWorkout(w)}/>)}
       </div>
-      {sel&&<WModal w={sel} onClose={()=>setSel(null)}/>}
     </div>
   );
 }
 
 function WModal({w,onClose}){
+  const tc=TC[w.type]||MT;
+  const totalSets=w.exercises?.reduce((a,e)=>a+(e.sets?.length||0),0)||0;
+  const totalExs=w.exercises?.filter(e=>e.sets?.length>0).length||0;
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"flex-end",zIndex:100}}>
-      <div style={{background:BG2,border:`1px solid ${BD}`,borderRadius:"20px 20px 0 0",padding:"20px 18px 28px",width:"100%",maxHeight:"75vh",overflowY:"auto",boxSizing:"border-box"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"flex-end",zIndex:999}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:"20px 20px 0 0",padding:"20px 18px 36px",width:"100%",maxHeight:"80vh",overflowY:"auto",boxSizing:"border-box"}}>
+        <div style={{width:36,height:4,background:DIM,borderRadius:2,margin:"0 auto 18px"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
           <div>
-            <span style={{fontSize:18,fontWeight:700}}>{w.type==="cardio"?"Cardio":w.type==="upper"?"Upper":"Lower"}</span>
-            <span style={{fontSize:12,color:MT,fontFamily:MONO,marginLeft:10}}>{fDate(w.date)}</span>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <span style={{background:`${tc}22`,color:tc,fontSize:12,fontWeight:700,padding:"3px 8px",borderRadius:6,fontFamily:MONO}}>{w.type?.toUpperCase()}</span>
+              <span style={{fontSize:13,color:MT,fontFamily:MONO}}>{fDate(w.date)}</span>
+            </div>
+            {w.type!=="cardio"&&<div style={{fontSize:12,color:MT}}>{totalExs} ejercicios · {totalSets} sets</div>}
           </div>
-          <button onClick={onClose} style={{...btnS({padding:"5px 12px",fontSize:18,borderRadius:8})}}>×</button>
+          <button onClick={onClose} style={{background:"none",border:"none",color:MT,cursor:"pointer",fontSize:24,lineHeight:1,padding:"0 4px"}}>×</button>
         </div>
         {w.type==="cardio"?(
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {[["distancia",`${w.cardio?.distance} km`,T],["tiempo",w.cardio?.time,T],["ritmo",w.cardio?.pace||calcPace(w.cardio?.distance,w.cardio?.time),A],["zona",w.cardio?.zone,ZC[w.cardio?.zone]]].map(([l,v,c])=>(
-              <Card key={l} s={{}}><div style={{fontSize:11,color:MT,fontFamily:MONO,marginBottom:3}}>{l}</div><div style={{fontSize:17,fontWeight:700,fontFamily:MONO,color:c}}>{v}</div></Card>
-            ))}
-            {w.cardio?.notes&&<Card s={{gridColumn:"1/-1"}}><div style={{fontSize:11,color:MT,fontFamily:MONO,marginBottom:4}}>notas</div><div style={{fontSize:13,color:MT}}>{w.cardio.notes}</div></Card>}
+          <div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+              {[["distancia",`${w.cardio?.distance} km`,T],["tiempo",w.cardio?.time,T],["ritmo",w.cardio?.pace||calcPace(w.cardio?.distance,w.cardio?.time),A],["zona",w.cardio?.zone,ZC[w.cardio?.zone]]].map(([l,v,c])=>(
+                <div key={l} style={{background:BG3,borderRadius:10,padding:"12px 14px"}}>
+                  <div style={{fontSize:10,color:MT,fontFamily:MONO,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{l}</div>
+                  <div style={{fontSize:18,fontWeight:700,fontFamily:MONO,color:c}}>{v||"—"}</div>
+                </div>
+              ))}
+            </div>
+            {w.cardio?.notes&&<div style={{background:BG3,borderRadius:10,padding:"12px 14px"}}>
+              <div style={{fontSize:10,color:MT,fontFamily:MONO,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>notas</div>
+              <div style={{fontSize:13,color:MT,lineHeight:1.5}}>{w.cardio.notes}</div>
+            </div>}
           </div>
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {(!w.exercises||w.exercises.length===0)&&<div style={{textAlign:"center",color:DIM,padding:"20px 0",fontSize:13}}>Sin ejercicios registrados</div>}
             {w.exercises?.map((ex,i)=>(
-              <Card key={i} s={{}}><div style={{fontSize:13,fontWeight:600,color:T,marginBottom:6}}>{ex.name}</div>
+              <div key={i} style={{background:BG3,borderRadius:10,padding:"12px 14px"}}>
+                <div style={{fontSize:14,fontWeight:600,color:T,marginBottom:8}}>{ex.name}</div>
+                {(!ex.sets||ex.sets.length===0)&&<div style={{fontSize:12,color:DIM}}>Sin sets</div>}
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {ex.sets?.map((s,j)=><span key={j} style={{background:BG3,border:`1px solid ${BD}`,borderRadius:6,padding:"3px 8px",fontSize:12,fontFamily:MONO,color:MT}}>S{j+1}: {s.weight}kg×{s.reps}</span>)}
+                  {ex.sets?.map((s,j)=>(
+                    <div key={j} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:6,padding:"5px 10px",fontFamily:MONO}}>
+                      <div style={{fontSize:10,color:MT,marginBottom:1}}>S{j+1}</div>
+                      <div style={{fontSize:13,color:T,fontWeight:600}}>{s.weight||"—"}<span style={{fontSize:10,color:MT}}>kg</span> × {s.reps||"—"}</div>
+                    </div>
+                  ))}
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         )}
