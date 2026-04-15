@@ -69,17 +69,17 @@ function App(){
   const addWorkout=w=>{const d=[{...w,id:Date.now()},...workouts];saveWorkouts(d);};
   const addWeight=e=>{const d=[e,...weights.filter(x=>x.date!==e.date)].sort((a,b)=>b.date.localeCompare(a.date));saveWeights(d);};
   const setNutDay=(date,data)=>{const d={...nutrition,[date]:data};saveNutrition(d);};
-  const props={workouts,exercises,weights,nutrition,goals,saveExercises,addWorkout,addWeight,setNutDay,saveGoals,setView};
+  const props={workouts,exercises,weights,nutrition,goals,saveExercises,addWorkout,addWeight,setNutDay,saveGoals,setView,selWorkout,setSelWorkout};
   return(
     <div style={{background:BG,minHeight:"100dvh",display:"flex",flexDirection:"column",fontFamily:SANS,color:T}}>
       <div style={{flex:1,overflowY:"auto",paddingBottom:64,paddingTop:"env(safe-area-inset-top)"}}>
         {view==="dashboard"&&<Dashboard {...props}/>}
         {view==="new"&&<NewWorkout {...props}/>}
         {view==="history"&&<History {...props}/>}
+        {view==="workout-detail"&&selWorkout&&<WorkoutDetail w={selWorkout} onBack={()=>{setView("history");setSelWorkout(null);}}/>}
         {view==="nutrition"&&<Nutrition {...props}/>}
         {view==="library"&&<Library {...props}/>}
       </div>
-      {selWorkout&&<WModal w={selWorkout} onClose={()=>setSelWorkout(null)}/>}
       <BottomNav view={view} setView={setView}/>
     </div>
   );
@@ -300,9 +300,10 @@ function StrengthForm({exs,addSet,rmSet,updSet,rmEx,newEx,setNewEx,addCustom}){
   );
 }
 
-function History({workouts,setSelWorkout}){
+function History({workouts,setSelWorkout,setView}){
   const[filter,setFilter]=useState("all");
   const fil=filter==="all"?workouts:workouts.filter(w=>w.type===filter);
+  const openWorkout=w=>{setSelWorkout(w);setView("workout-detail");};
   return(
     <div>
       <div style={{padding:"20px 16px 12px"}}>
@@ -317,63 +318,63 @@ function History({workouts,setSelWorkout}){
       </div>
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:8}}>
         {!fil.length&&<div style={{textAlign:"center",color:DIM,marginTop:40,fontSize:14}}>Sin sesiones registradas</div>}
-        {fil.map(w=><WRow key={w.id} w={w} onClick={()=>setSelWorkout(w)}/>)}
+        {fil.map(w=><WRow key={w.id} w={w} onClick={()=>openWorkout(w)}/>)}
       </div>
     </div>
   );
 }
 
-function WModal({w,onClose}){
+function WorkoutDetail({w,onBack}){
   const tc=TC[w.type]||MT;
   const totalSets=w.exercises?.reduce((a,e)=>a+(e.sets?.length||0),0)||0;
   const totalExs=w.exercises?.filter(e=>e.sets?.length>0).length||0;
   return(
-    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"flex-end",zIndex:999}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:"20px 20px 0 0",padding:"20px 18px 36px",width:"100%",maxHeight:"80vh",overflowY:"auto",boxSizing:"border-box"}}>
-        <div style={{width:36,height:4,background:DIM,borderRadius:2,margin:"0 auto 18px"}}/>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-          <div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-              <span style={{background:`${tc}22`,color:tc,fontSize:12,fontWeight:700,padding:"3px 8px",borderRadius:6,fontFamily:MONO}}>{w.type?.toUpperCase()}</span>
-              <span style={{fontSize:13,color:MT,fontFamily:MONO}}>{fDate(w.date)}</span>
-            </div>
-            {w.type!=="cardio"&&<div style={{fontSize:12,color:MT}}>{totalExs} ejercicios · {totalSets} sets</div>}
+    <div>
+      <div style={{padding:"20px 16px 12px",display:"flex",alignItems:"center",gap:12}}>
+        <button onClick={onBack} style={{background:"none",border:"none",color:MT,cursor:"pointer",fontSize:24,padding:0,lineHeight:1}}>←</button>
+        <div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <span style={{background:`${tc}22`,color:tc,fontSize:12,fontWeight:700,padding:"3px 8px",borderRadius:6,fontFamily:MONO}}>{w.type?.toUpperCase()}</span>
+            <span style={{fontSize:13,color:MT,fontFamily:MONO}}>{fDate(w.date)}</span>
           </div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:MT,cursor:"pointer",fontSize:24,lineHeight:1,padding:"0 4px"}}>×</button>
+          {w.type!=="cardio"&&<div style={{fontSize:12,color:MT,marginTop:2}}>{totalExs} ejercicios · {totalSets} sets</div>}
         </div>
+      </div>
+      <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
         {w.type==="cardio"?(
           <div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
               {[["distancia",`${w.cardio?.distance} km`,T],["tiempo",w.cardio?.time,T],["ritmo",w.cardio?.pace||calcPace(w.cardio?.distance,w.cardio?.time),A],["zona",w.cardio?.zone,ZC[w.cardio?.zone]]].map(([l,v,c])=>(
-                <div key={l} style={{background:BG3,borderRadius:10,padding:"12px 14px"}}>
-                  <div style={{fontSize:10,color:MT,fontFamily:MONO,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>{l}</div>
-                  <div style={{fontSize:18,fontWeight:700,fontFamily:MONO,color:c}}>{v||"—"}</div>
+                <div key={l} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:12,padding:"14px 16px"}}>
+                  <div style={{fontSize:10,color:MT,fontFamily:MONO,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>{l}</div>
+                  <div style={{fontSize:22,fontWeight:700,fontFamily:MONO,color:c}}>{v||"—"}</div>
                 </div>
               ))}
             </div>
-            {w.cardio?.notes&&<div style={{background:BG3,borderRadius:10,padding:"12px 14px"}}>
-              <div style={{fontSize:10,color:MT,fontFamily:MONO,letterSpacing:1,textTransform:"uppercase",marginBottom:4}}>notas</div>
-              <div style={{fontSize:13,color:MT,lineHeight:1.5}}>{w.cardio.notes}</div>
+            {w.cardio?.notes&&<div style={{background:BG2,border:`1px solid ${BD}`,borderRadius:12,padding:"14px 16px"}}>
+              <div style={{fontSize:10,color:MT,fontFamily:MONO,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>notas</div>
+              <div style={{fontSize:14,color:MT,lineHeight:1.6}}>{w.cardio.notes}</div>
             </div>}
           </div>
         ):(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {(!w.exercises||w.exercises.length===0)&&<div style={{textAlign:"center",color:DIM,padding:"20px 0",fontSize:13}}>Sin ejercicios registrados</div>}
+          <>
+            {(!w.exercises||w.exercises.length===0)&&<div style={{textAlign:"center",color:DIM,padding:"40px 0",fontSize:14}}>Sin ejercicios registrados</div>}
             {w.exercises?.map((ex,i)=>(
-              <div key={i} style={{background:BG3,borderRadius:10,padding:"12px 14px"}}>
-                <div style={{fontSize:14,fontWeight:600,color:T,marginBottom:8}}>{ex.name}</div>
-                {(!ex.sets||ex.sets.length===0)&&<div style={{fontSize:12,color:DIM}}>Sin sets</div>}
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              <div key={i} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:12,padding:"14px 16px"}}>
+                <div style={{fontSize:15,fontWeight:600,color:T,marginBottom:10}}>{ex.name}</div>
+                {(!ex.sets||ex.sets.length===0)&&<div style={{fontSize:12,color:DIM}}>Sin sets registrados</div>}
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                   {ex.sets?.map((s,j)=>(
-                    <div key={j} style={{background:BG2,border:`1px solid ${BD}`,borderRadius:6,padding:"5px 10px",fontFamily:MONO}}>
-                      <div style={{fontSize:10,color:MT,marginBottom:1}}>S{j+1}</div>
-                      <div style={{fontSize:13,color:T,fontWeight:600}}>{s.weight||"—"}<span style={{fontSize:10,color:MT}}>kg</span> × {s.reps||"—"}</div>
+                    <div key={j} style={{background:BG3,borderRadius:8,padding:"8px 12px",textAlign:"center"}}>
+                      <div style={{fontSize:10,color:MT,fontFamily:MONO,marginBottom:3}}>Set {j+1}</div>
+                      <div style={{fontSize:15,fontWeight:700,fontFamily:MONO,color:T}}>{s.weight||"—"}<span style={{fontSize:11,color:MT,fontWeight:400}}>kg</span></div>
+                      <div style={{fontSize:12,color:MT,fontFamily:MONO}}>{s.reps||"—"} reps</div>
                     </div>
                   ))}
                 </div>
               </div>
             ))}
-          </div>
+          </>
         )}
       </div>
     </div>
